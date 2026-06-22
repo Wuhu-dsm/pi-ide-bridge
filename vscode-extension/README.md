@@ -68,7 +68,7 @@ Open settings (`Cmd/Ctrl + ,`) and search for **Pi IDE Bridge**:
 
 - `piIdeBridge.port` — base port the Pi IDE bridge listens on. Default: `17325`.
 - `piIdeBridge.enabled` — turn context reporting on/off. Default: `true`.
-- `piIdeBridge.heartbeatInterval` — milliseconds between heartbeat pings. Default: `5000`. Set to `0` to disable.
+- `piIdeBridge.heartbeatInterval` — milliseconds between heartbeat pings. Default: `2000`. Set to `0` to disable.
 
 You can also run **Enable Pi IDE Bridge** / **Disable Pi IDE Bridge** from the command palette.
 

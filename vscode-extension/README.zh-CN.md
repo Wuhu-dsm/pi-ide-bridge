@@ -68,7 +68,7 @@ Pi 会自动检测 PATH 上的 VS Code / Cursor / Trae，从 GitHub 下载最新
 
 - `piIdeBridge.port` —— Pi IDE bridge HTTP 服务器监听的基础端口。默认：`17325`。
 - `piIdeBridge.enabled` —— 是否开启上下文上报。默认：`true`。
-- `piIdeBridge.heartbeatInterval` —— 心跳间隔毫秒数。默认：`5000`，设为 `0` 可关闭。
+- `piIdeBridge.heartbeatInterval` —— 心跳间隔毫秒数。默认：`2000`，设为 `0` 可关闭。
 
 也可以在命令面板中运行 **Enable Pi IDE Bridge** / **Disable Pi IDE Bridge**。
 

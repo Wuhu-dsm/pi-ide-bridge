@@ -70,8 +70,11 @@ const MAX_SELECTION_LINES = 100;
 const MAX_OPEN_FILES_IN_AUTOCOMPLETE = 20;
 const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024; // 10 MB
 
-const HEARTBEAT_INTERVAL_MS = 5_000;
-const HEARTBEAT_TIMEOUT_MS = 15_000;
+const HEARTBEAT_INTERVAL_MS = 2_000;
+const HEARTBEAT_TIMEOUT_MS = 5_000;
+
+const STATE_FILE_NAME = "ide-bridge-state.json";
+const STATE_MAX_AGE_MS = 60_000;
 
 const EDITOR_LABELS: Record<IDEEditor, string> = {
 	vscode: "VS Code",
@@ -85,6 +88,62 @@ function getAgentDir(): string {
 
 function getPortFilePath(): string {
 	return path.join(getAgentDir(), "ide-bridge.port");
+}
+
+function getStateFilePath(): string {
+	return path.join(getAgentDir(), STATE_FILE_NAME);
+}
+
+interface PersistedIDEState {
+	persistedAt: number;
+	state: IDEState;
+}
+
+function persistState(currentState: IDEState): void {
+	try {
+		fs.mkdirSync(getAgentDir(), { recursive: true });
+		const payload: PersistedIDEState = {
+			persistedAt: Date.now(),
+			state: currentState,
+		};
+		fs.writeFileSync(getStateFilePath(), JSON.stringify(payload), "utf8");
+	} catch {
+		// Best-effort persistence.
+	}
+}
+
+function loadPersistedState(): { state: IDEState; persistedAt: number } | null {
+	try {
+		const raw = fs.readFileSync(getStateFilePath(), "utf8");
+		const parsed = JSON.parse(raw) as PersistedIDEState;
+		if (typeof parsed.persistedAt !== "number") return null;
+		if (Date.now() - parsed.persistedAt > STATE_MAX_AGE_MS) return null;
+
+		const s = parsed.state;
+		if (
+			typeof s !== "object" ||
+			s === null ||
+			typeof s.connected !== "boolean" ||
+			!Array.isArray(s.workspaceRoots) ||
+			!Array.isArray(s.openFiles)
+		) {
+			return null;
+		}
+
+		return {
+			state: {
+				connected: s.connected,
+				editor: s.editor,
+				activeFile: s.activeFile,
+				workspaceRoots: s.workspaceRoots,
+				openFiles: s.openFiles,
+				selection: s.selection,
+			},
+			persistedAt: parsed.persistedAt,
+		};
+	} catch {
+		return null;
+	}
 }
 
 function normalizeEditor(editor: string | null | undefined): IDEEditor | null {
@@ -551,6 +610,14 @@ export default function (pi: ExtensionAPI): void {
 	pi.on("session_start", async (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
 		currentCtx = ctx;
+
+		const persisted = loadPersistedState();
+		if (persisted) {
+			state = persisted.state;
+			lastActivityAt = persisted.persistedAt;
+			updateStatus(ctx);
+		}
+
 		if (server !== null) {
 			updateStatus(ctx);
 			return;
@@ -611,6 +678,7 @@ export default function (pi: ExtensionAPI): void {
 						selection: update.selection ? truncateSelection(update.selection) : null,
 					};
 					updateStatus(ctxRef);
+					persistState(state);
 				}
 				markActivity(ctxRef);
 				res.writeHead(200);
@@ -669,6 +737,7 @@ export default function (pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_shutdown", async () => {
+		persistState(state);
 		if (heartbeatTimer) {
 			clearInterval(heartbeatTimer);
 			heartbeatTimer = undefined;

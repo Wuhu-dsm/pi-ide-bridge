@@ -32,7 +32,7 @@ type IDEInsertRequest = IDEFileInsert | IDETerminalInsert;
 
 const MAX_PORT_ATTEMPTS = 10;
 const INSERT_CLIPBOARD_DELAY_MS = 100;
-const DEFAULT_HEARTBEAT_MS = 5000;
+const DEFAULT_HEARTBEAT_MS = 2000;
 
 function detectEditor(): "vscode" | "cursor" | "trae" {
 	const appName = vscode.env.appName.toLowerCase();
