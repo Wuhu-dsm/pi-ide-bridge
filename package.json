@@ -29,8 +29,7 @@
 	"pi": {
 		"extensions": [
 			"./extensions"
-		],
-		"image": "https://github.com/Wuhu-dsm/pi-ide-bridge/raw/main/screenshot.png"
+		]
 	},
 	"peerDependencies": {
 		"@earendil-works/pi-coding-agent": "*",
