@@ -1,6 +1,6 @@
 {
 	"name": "pi-ide-bridge",
-	"version": "0.4.0",
+	"version": "0.4.1",
 	"description": "IDE bridge extension for Pi: VS Code / Cursor / Trae context, file inserts, and heartbeat support.",
 	"main": "extensions/ide-bridge.ts",
 	"keywords": [

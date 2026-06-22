@@ -428,10 +428,25 @@ async function downloadVsix(assetUrl: string, assetName: string): Promise<string
 	return tempPath;
 }
 
+async function execEditorCli(
+	pi: ExtensionAPI,
+	cli: string,
+	args: string[],
+	options: { timeout: number },
+): Promise<ExecResult> {
+	// On Windows, editor CLIs ship as .cmd wrappers in a directory on PATH.
+	// pi.exec uses Node's spawn with shell:false, which cannot resolve or
+	// execute .cmd files directly. Run via cmd /c so PATH resolution works.
+	if (process.platform === "win32") {
+		return pi.exec("cmd", ["/c", cli, ...args], options);
+	}
+	return pi.exec(cli, args, options);
+}
+
 async function detectInstalledEditors(pi: ExtensionAPI): Promise<DetectedEditor[]> {
 	const detected: DetectedEditor[] = [];
 	for (const candidate of EDITOR_CANDIDATES) {
-		const result = await pi.exec(candidate.cli, ["--version"], { timeout: 5_000 });
+		const result = await execEditorCli(pi, candidate.cli, ["--version"], { timeout: 5_000 });
 		if (result.code === 0) {
 			const version = result.stdout.split(/\r?\n/)[0]?.trim() || "unknown";
 			detected.push({ ...candidate, version });
@@ -441,7 +456,7 @@ async function detectInstalledEditors(pi: ExtensionAPI): Promise<DetectedEditor[
 }
 
 async function installVsix(pi: ExtensionAPI, cli: string, vsixPath: string): Promise<ExecResult> {
-	return pi.exec(cli, ["--install-extension", vsixPath, "--force"], { timeout: INSTALL_TIMEOUT_MS });
+	return execEditorCli(pi, cli, ["--install-extension", vsixPath, "--force"], { timeout: INSTALL_TIMEOUT_MS });
 }
 
 export default function (pi: ExtensionAPI): void {
