@@ -4,6 +4,12 @@
 	"description": "Sends VS Code, Cursor, and Trae context (active file, selection, open files, workspace roots) to the Pi coding agent.",
 	"version": "0.3.0",
 	"publisher": "earendil-works",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Wuhu-dsm/pi-ide-bridge.git",
+		"directory": "vscode-extension"
+	},
 	"engines": {
 		"vscode": "^1.80.0"
 	},
