@@ -2,6 +2,8 @@
 
 Companion extension for the [Pi coding agent](https://pi.dev). It sends your editor context to Pi so Pi knows what file you are looking at, what code you have selected, and which files are open.
 
+[简体中文](README.zh-CN.md)
+
 ## Features
 
 - Reports the active file and all workspace roots (multi-root workspace support).
@@ -13,28 +15,40 @@ Companion extension for the [Pi coding agent](https://pi.dev). It sends your edi
 - Right-click selected text in the integrated terminal to send it to Pi.
 - Works in VS Code, Cursor, and Trae.
 
-## Install
+## Quick install (recommended)
 
-> The VS Code Marketplace version is not published yet. For now install from the `.vsix` in the [GitHub releases](https://github.com/Wuhu-dsm/pi-ide-bridge/releases/latest).
+If you already have the Pi IDE Bridge extension installed in Pi, just run:
+
+```text
+/ide init
+```
+
+Pi will detect VS Code / Cursor / Trae on your PATH, download the latest companion `.vsix` from GitHub, and install it automatically. It works on macOS, Windows, and Linux.
+
+If the command cannot find your editor, make sure its CLI is on PATH (for example, run the "Shell Command: Install 'code' command in PATH" step in VS Code).
+
+## Manual install
+
+> The VS Code Marketplace version is not published yet. You can also install manually from the `.vsix` in the [GitHub releases](https://github.com/Wuhu-dsm/pi-ide-bridge/releases/latest).
 
 1. Download the latest `.vsix`:
 
    ```bash
-   curl -L -o pi-ide-bridge-vscode-0.3.0.vsix \
-     https://github.com/Wuhu-dsm/pi-ide-bridge/releases/download/v0.3.0/pi-ide-bridge-vscode-0.3.0.vsix
+   curl -L -o pi-ide-bridge-vscode-0.4.0.vsix \
+     https://github.com/Wuhu-dsm/pi-ide-bridge/releases/download/v0.4.0/pi-ide-bridge-vscode-0.4.0.vsix
    ```
 
 2. Install into your editor:
 
    ```bash
    # VS Code
-   code --install-extension pi-ide-bridge-vscode-0.3.0.vsix
+   code --install-extension pi-ide-bridge-vscode-0.4.0.vsix
 
    # Cursor
-   cursor --install-extension pi-ide-bridge-vscode-0.3.0.vsix
+   cursor --install-extension pi-ide-bridge-vscode-0.4.0.vsix
 
    # Trae
-   trae --install-extension pi-ide-bridge-vscode-0.3.0.vsix
+   trae --install-extension pi-ide-bridge-vscode-0.4.0.vsix
    ```
 
    Or open the Extensions view, click `...` → **Install from VSIX**.
@@ -77,7 +91,7 @@ All insert actions are broadcast to every running Pi instance on the configured 
 
 ## How it works
 
-The Pi extension starts a small HTTP server on `127.0.0.1`. It first tries the configured base port (default `17325`) and, if that port is already in use by another Pi instance, automatically tries the next ports up to `17325 + 9`. Each new Pi terminal therefore gets its own listener without manual port configuration.
+The Pi extension starts a small HTTP server on `127.0.0.1`. It first tries the configured base port (default `17325`), and if that port is already in use by another Pi instance, automatically tries the next ports up to `17325 + 9`. Each new Pi terminal therefore gets its own listener without manual port configuration.
 
 The companion extension POSTs editor state to the entire port range whenever the active editor or selection changes. It also sends periodic heartbeats to `/ide-ping` so Pi can detect when the editor has been closed. Closing a file or clearing the selection sends an empty state, which clears the Pi status bar and stops injecting stale code.
 

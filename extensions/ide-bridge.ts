@@ -9,6 +9,7 @@
  * - Enhances `@` autocompletion with IDE open files.
  * - Accepts file/terminal insertions from the companion IDE extension.
  * - Tracks IDE heartbeats and reverts to "not connected" when the IDE goes away.
+ * - Provides `/ide init` to download and install the companion IDE extension.
  *
  * Each new Pi terminal binds to the first free port in the configured range so
  * multiple Pi instances can run side by side without EADDRINUSE errors.
@@ -18,9 +19,10 @@
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import * as fs from "node:fs";
+import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ExecResult } from "@earendil-works/pi-coding-agent";
 import type { AutocompleteItem, AutocompleteProvider, AutocompleteSuggestions, KeyId } from "@earendil-works/pi-tui";
 
 interface IDESelection {
@@ -348,6 +350,98 @@ function isSameState(a: IDEState, b: IDEStateUpdate, normalizedEditor: IDEEditor
 	if (!isSameStringArray(a.openFiles, b.openFiles)) return false;
 	if (!isSameSelection(a.selection, b.selection)) return false;
 	return true;
+}
+
+// ============================================================================
+// One-click companion extension installer ("/ide init")
+// ============================================================================
+
+const GITHUB_OWNER = "Wuhu-dsm";
+const GITHUB_REPO = "pi-ide-bridge";
+const VSIX_ASSET_PREFIX = "pi-ide-bridge-vscode-";
+const VSIX_ASSET_SUFFIX = ".vsix";
+const INSTALL_TIMEOUT_MS = 60_000;
+
+interface GitHubReleaseAsset {
+	name: string;
+	browser_download_url: string;
+	content_type?: string;
+}
+
+interface GitHubRelease {
+	tag_name: string;
+	assets: GitHubReleaseAsset[];
+}
+
+interface EditorCandidate {
+	name: string;
+	cli: string;
+}
+
+interface DetectedEditor {
+	name: string;
+	cli: string;
+	version: string;
+}
+
+const EDITOR_CANDIDATES: EditorCandidate[] = [
+	{ name: "VS Code", cli: "code" },
+	{ name: "VS Code Insiders", cli: "code-insiders" },
+	{ name: "Cursor", cli: "cursor" },
+	{ name: "Trae", cli: "trae" },
+	{ name: "Trae CN", cli: "trae.cn" },
+];
+
+async function fetchLatestRelease(): Promise<{ version: string; assetUrl: string; assetName: string }> {
+	const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
+	const response = await fetch(url, {
+		headers: {
+			Accept: "application/vnd.github+json",
+			"User-Agent": "pi-ide-bridge-extension",
+		},
+	});
+	if (!response.ok) {
+		throw new Error(`GitHub API returned ${response.status} ${response.statusText}`);
+	}
+
+	const release = (await response.json()) as GitHubRelease;
+	const asset = release.assets.find(
+		(a) => a.name.startsWith(VSIX_ASSET_PREFIX) && a.name.endsWith(VSIX_ASSET_SUFFIX),
+	);
+	if (!asset) {
+		throw new Error(`No .vsix asset found in release ${release.tag_name}`);
+	}
+
+	const version = release.tag_name.replace(/^v/, "");
+	return { version, assetUrl: asset.browser_download_url, assetName: asset.name };
+}
+
+async function downloadVsix(assetUrl: string, assetName: string): Promise<string> {
+	const response = await fetch(assetUrl);
+	if (!response.ok) {
+		throw new Error(`Download returned ${response.status} ${response.statusText}`);
+	}
+
+	const buffer = await response.arrayBuffer();
+	const tempPath = path.join(os.tmpdir(), `pi-ide-bridge-${Date.now()}-${assetName}`);
+	await fsp.writeFile(tempPath, new Uint8Array(buffer));
+	return tempPath;
+}
+
+async function detectInstalledEditors(pi: ExtensionAPI): Promise<DetectedEditor[]> {
+	const detected: DetectedEditor[] = [];
+	for (const candidate of EDITOR_CANDIDATES) {
+		const result = await pi.exec(candidate.cli, ["--version"], { timeout: 5_000 });
+		if (result.code === 0) {
+			const version = result.stdout.split(/\r?\n/)[0]?.trim() || "unknown";
+			detected.push({ ...candidate, version });
+		}
+	}
+	return detected;
+}
+
+async function installVsix(pi: ExtensionAPI, cli: string, vsixPath: string): Promise<ExecResult> {
+	return pi.exec(cli, ["--install-extension", vsixPath, "--force"], { timeout: INSTALL_TIMEOUT_MS });
 }
 
 export default function (pi: ExtensionAPI): void {
@@ -681,6 +775,103 @@ export default function (pi: ExtensionAPI): void {
 				updateStatus(ctx);
 			}
 			ctx.ui.notify("IDE selection cleared", "info");
+		},
+	});
+
+	pi.registerCommand("ide", {
+		description: "Install the companion VS Code/Cursor/Trae extension (/ide init)",
+		handler: async (args, ctx) => {
+			if (!ctx.hasUI) {
+				// eslint-disable-next-line no-console
+				console.log("/ide init is only available in Pi's interactive TUI.");
+				return;
+			}
+
+			const subcommand = args.trim().toLowerCase();
+			if (subcommand !== "init") {
+				ctx.ui.notify("Usage: /ide init  (installs the companion IDE extension)", "warning");
+				return;
+			}
+
+			ctx.ui.notify("🔍 Checking for the latest companion IDE extension...", "info");
+
+			let release: { version: string; assetUrl: string; assetName: string };
+			try {
+				release = await fetchLatestRelease();
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				ctx.ui.notify(
+					`Could not fetch latest release: ${message}\nPlease install manually from https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+					"error",
+				);
+				return;
+			}
+
+			ctx.ui.notify(`📦 Latest companion extension: ${release.version}`, "info");
+
+			let editors: DetectedEditor[];
+			try {
+				editors = await detectInstalledEditors(pi);
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				ctx.ui.notify(`Could not detect editors: ${message}`, "error");
+				return;
+			}
+
+			if (editors.length === 0) {
+				ctx.ui.notify(
+					"No supported editor CLI found on PATH.\nSupported: code, code-insiders, cursor, trae, trae.cn\nMake sure your editor's command line tools are installed, then run /ide init again.",
+					"warning",
+				);
+				return;
+			}
+
+			const editorList = editors.map((e) => `${e.name} (${e.version})`).join(", ");
+			ctx.ui.notify(`Detected editors: ${editorList}`, "info");
+
+			const confirmed = await ctx.ui.confirm(
+				"Install Pi IDE Bridge companion extension?",
+				`Editors: ${editorList}\n\nThis will download ${release.assetName} and install it into each detected editor.`,
+			);
+			if (!confirmed) {
+				ctx.ui.notify("Installation cancelled.", "info");
+				return;
+			}
+
+			let vsixPath: string;
+			try {
+				vsixPath = await downloadVsix(release.assetUrl, release.assetName);
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				ctx.ui.notify(`Download failed: ${message}`, "error");
+				return;
+			}
+
+			ctx.ui.notify("Installing companion extension...", "info");
+
+			const results: string[] = [];
+			for (const editor of editors) {
+				ctx.ui.notify(`⏳ Installing for ${editor.name}...`, "info");
+				const result = await installVsix(pi, editor.cli, vsixPath);
+				if (result.code === 0) {
+					results.push(`✅ ${editor.name}: installed`);
+				} else {
+					const detail = (result.stderr || result.stdout || "unknown error").trim();
+					results.push(`❌ ${editor.name}: ${detail}`);
+				}
+			}
+
+			try {
+				await fsp.unlink(vsixPath);
+			} catch {
+				// Ignore cleanup failure.
+			}
+
+			ctx.ui.notify(`Installation results:\n${results.join("\n")}`, "info");
+			ctx.ui.notify(
+				"🔄 If the companion extension does not activate automatically, reload your editor window (Command Palette → 'Developer: Reload Window').",
+				"info",
+			);
 		},
 	});
 

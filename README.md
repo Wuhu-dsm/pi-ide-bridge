@@ -2,6 +2,8 @@
 
 Pi extension that bridges your IDE (VS Code, Cursor, Trae) with the Pi coding agent.
 
+[简体中文](README.zh-CN.md)
+
 ## Features
 
 - **Live IDE context**: active file, workspace roots, open files, and current selection.
@@ -10,7 +12,9 @@ Pi extension that bridges your IDE (VS Code, Cursor, Trae) with the Pi coding ag
 - **Heartbeats** via `/ide-ping` for accurate disconnect detection.
 - **File/terminal inserts** from the IDE into Pi's input editor.
 - **Enhanced `@` autocompletion** with open IDE files.
+- **One-click companion install** via `/ide init`.
 - **Slash commands**:
+  - `/ide init` — install the VS Code / Cursor / Trae companion extension
   - `/ide-state`
   - `/ide-bridge-port`
   - `/ide-insert-active-file`
@@ -30,7 +34,7 @@ pi install npm:pi-ide-bridge
 Or install from git:
 
 ```bash
-pi install git:github.com/Wuhu-dsm/pi-ide-bridge@v0.3.0
+pi install git:github.com/Wuhu-dsm/pi-ide-bridge@v0.4.0
 ```
 
 Then reload Pi:
@@ -38,6 +42,16 @@ Then reload Pi:
 ```text
 /reload
 ```
+
+### Install the companion IDE extension
+
+After the Pi extension is loaded, run:
+
+```text
+/ide init
+```
+
+Pi will detect any VS Code / Cursor / Trae CLI on your PATH, download the latest companion `.vsix` from GitHub, and install it automatically. If the editor CLI is not on PATH, install it manually (see below).
 
 ## Update
 
@@ -62,13 +76,13 @@ The companion extension for VS Code / Cursor / Trae is available as a `.vsix` fr
 
 ```bash
 # VS Code
-code --install-extension pi-ide-bridge-vscode-0.3.0.vsix
+code --install-extension pi-ide-bridge-vscode-0.4.0.vsix
 
 # Cursor
-cursor --install-extension pi-ide-bridge-vscode-0.3.0.vsix
+cursor --install-extension pi-ide-bridge-vscode-0.4.0.vsix
 
 # Trae
-trae --install-extension pi-ide-bridge-vscode-0.3.0.vsix
+trae --install-extension pi-ide-bridge-vscode-0.4.0.vsix
 ```
 
 Or open the Extensions view, click `...` → **Install from VSIX**.
