@@ -2,8 +2,6 @@
 
 Pi extension that bridges your IDE (VS Code, Cursor, Trae) with the Pi coding agent.
 
-[简体中文](README.zh-CN.md)
-
 ## Features
 
 - **Live IDE context**: active file, workspace roots, open files, and current selection.
