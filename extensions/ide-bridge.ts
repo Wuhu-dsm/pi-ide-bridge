@@ -526,6 +526,11 @@ export default function (pi: ExtensionAPI): void {
 		if (!state.connected) return;
 		if (Date.now() - lastActivityAt > HEARTBEAT_TIMEOUT_MS) {
 			state.connected = false;
+			state.editor = null;
+			state.activeFile = null;
+			state.workspaceRoots = [];
+			state.openFiles = [];
+			state.selection = null;
 			if (currentCtx) updateStatus(currentCtx);
 		}
 	}
@@ -686,6 +691,7 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("before_agent_start", async (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
+		if (!state.connected) return;
 		if (!state.activeFile && !state.selection) return;
 
 		const message = buildContextMessage(state);

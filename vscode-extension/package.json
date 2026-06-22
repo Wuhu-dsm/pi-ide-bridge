@@ -2,7 +2,7 @@
 	"name": "pi-ide-bridge-vscode",
 	"displayName": "Pi IDE Bridge (VS Code / Cursor / Trae)",
 	"description": "Sends VS Code, Cursor, and Trae context (active file, selection, open files, workspace roots) to the Pi coding agent.",
-	"version": "0.4.1",
+	"version": "0.4.2",
 	"publisher": "earendil-works",
 	"license": "MIT",
 	"repository": {
