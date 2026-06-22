@@ -23,12 +23,17 @@ interface IDEFileInsert {
 	path: string;
 }
 
+interface IDETextInsert {
+	type: "text";
+	text: string;
+}
+
 interface IDETerminalInsert {
 	type: "terminal";
 	text: string;
 }
 
-type IDEInsertRequest = IDEFileInsert | IDETerminalInsert;
+type IDEInsertRequest = IDEFileInsert | IDETextInsert | IDETerminalInsert;
 
 const MAX_PORT_ATTEMPTS = 10;
 const INSERT_CLIPBOARD_DELAY_MS = 100;
@@ -97,6 +102,7 @@ function sendRequestToPort(
 	path: string,
 	body: string,
 	logger: vscode.LogOutputChannel,
+	onNeedState?: () => void,
 ): void {
 	const req = http.request(
 		{
@@ -110,11 +116,31 @@ function sendRequestToPort(
 			},
 		},
 		(res) => {
-			res.resume();
+			let data = "";
+			res.setEncoding("utf8");
+			res.on("data", (chunk: string) => {
+				data += chunk;
+			});
+			res.on("end", () => {
+				if (!onNeedState || !data) return;
+				try {
+					const json = JSON.parse(data) as { needState?: boolean };
+					if (json.needState) onNeedState();
+				} catch {
+					// Ignore non-JSON responses.
+				}
+			});
 		},
 	);
+	req.setTimeout(3000, () => {
+		logger.debug(`Request to Pi port ${port} timed out`);
+		req.destroy();
+	});
 	req.on("error", (err) => {
 		logger.debug(`Pi not listening on port ${port}: ${err.message}`);
+	});
+	req.on("timeout", () => {
+		// timeout handler above calls req.destroy(); this catches the resulting error.
 	});
 	req.write(body);
 	req.end();
@@ -125,6 +151,7 @@ function broadcastRequest(
 	path: string,
 	body: string,
 	logger: vscode.LogOutputChannel,
+	onNeedState?: () => void,
 ): void {
 	// If a specific port file exists, try it first; fall back to scanning the range
 	// so multiple Pi instances still receive updates.
@@ -135,7 +162,7 @@ function broadcastRequest(
 		ports.add(basePort + offset);
 	}
 	for (const port of ports) {
-		sendRequestToPort(port, path, body, logger);
+		sendRequestToPort(port, path, body, logger, onNeedState);
 	}
 }
 
@@ -147,8 +174,8 @@ function broadcastInsert(basePort: number, request: IDEInsertRequest, logger: vs
 	broadcastRequest(basePort, "/editor-insert", JSON.stringify(request), logger);
 }
 
-function broadcastPing(basePort: number, logger: vscode.LogOutputChannel): void {
-	broadcastRequest(basePort, "/ide-ping", JSON.stringify({}), logger);
+function broadcastPing(basePort: number, logger: vscode.LogOutputChannel, onNeedState?: () => void): void {
+	broadcastRequest(basePort, "/ide-ping", JSON.stringify({}), logger, onNeedState);
 }
 
 async function readTerminalSelection(): Promise<string | undefined> {
@@ -215,7 +242,10 @@ export function activate(context: vscode.ExtensionContext): void {
 		if (heartbeatMs <= 0) return;
 		heartbeatTimer = setInterval(() => {
 			if (!enabled) return;
-			broadcastPing(basePort, logger);
+			broadcastPing(basePort, logger, () => {
+				// Pi just recovered from a disconnected state and needs a full state refresh.
+				scheduleUpdate();
+			});
 		}, heartbeatMs);
 	}
 
@@ -236,7 +266,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			return;
 		}
 		const text = editor.document.getText(editor.selection);
-		broadcastInsert(basePort, { type: "terminal", text }, logger);
+		broadcastInsert(basePort, { type: "text", text }, logger);
 		logger.info(`Inserted editor selection (${text.length} chars)`);
 	}
 
@@ -255,6 +285,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.window.onDidChangeTextEditorSelection(scheduleUpdate),
 		vscode.workspace.onDidOpenTextDocument(scheduleUpdate),
 		vscode.workspace.onDidCloseTextDocument(scheduleUpdate),
+		vscode.window.onDidChangeWindowState((e) => {
+			if (e.focused) scheduleUpdate();
+		}),
 		vscode.workspace.onDidChangeConfiguration((e) => {
 			if (e.affectsConfiguration("piIdeBridge")) {
 				const updated = vscode.workspace.getConfiguration("piIdeBridge");

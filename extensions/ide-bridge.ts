@@ -47,12 +47,17 @@ interface IDEFileInsert {
 	path: string;
 }
 
+interface IDETextInsert {
+	type: "text";
+	text: string;
+}
+
 interface IDETerminalInsert {
 	type: "terminal";
 	text: string;
 }
 
-type IDEInsertRequest = IDEFileInsert | IDETerminalInsert;
+type IDEInsertRequest = IDEFileInsert | IDETextInsert | IDETerminalInsert;
 
 interface IDEState {
 	connected: boolean;
@@ -198,18 +203,18 @@ function getBasePort(): number {
 }
 
 function truncateSelection(selection: IDESelection): IDESelection {
-	const lines = selection.text.split("\n");
 	let truncated = selection.text;
-	let endLine = selection.endLine;
 
+	const lines = truncated.split("\n");
 	if (lines.length > MAX_SELECTION_LINES) {
 		truncated = `${lines.slice(0, MAX_SELECTION_LINES).join("\n")}\n... (selection truncated)`;
-		endLine = selection.startLine + MAX_SELECTION_LINES - 1;
 	}
 
 	if (truncated.length > MAX_SELECTION_CHARS) {
 		truncated = `${truncated.slice(0, MAX_SELECTION_CHARS)}\n... (selection truncated)`;
 	}
+
+	const endLine = selection.startLine + truncated.split("\n").length - 1;
 
 	return {
 		text: truncated,
@@ -311,10 +316,20 @@ function createIDEAutocompleteProvider(current: AutocompleteProvider, getState: 
 	};
 }
 
+function escapeMarkdownLinkText(text: string): string {
+	return text.replace(/([\\\`*_{}[\]()#+\-.!|])/g, "\\$1");
+}
+
+function encodeFileUrl(filePath: string): string {
+	return encodeURI(filePath.replace(/\\/g, "/")).replace(/[()]/g, (c) =>
+		`%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+	);
+}
+
 function fileToMarkdownLink(filePath: string): string {
 	const name = path.posix.basename(filePath.replace(/\\/g, "/")) || filePath;
-	const url = `file://${encodeURI(filePath.replace(/\\/g, "/"))}`;
-	return `[${name}](${url})`;
+	const url = `file://${encodeFileUrl(filePath)}`;
+	return `[${escapeMarkdownLinkText(name)}](${url})`;
 }
 
 function readJsonBody(req: IncomingMessage): Promise<string> {
@@ -386,6 +401,7 @@ function validateIDEInsertRequest(request: unknown): request is IDEInsertRequest
 	if (typeof request !== "object" || request === null) return false;
 	const r = request as Record<string, unknown>;
 	if (r.type === "file") return typeof r.path === "string";
+	if (r.type === "text") return typeof r.text === "string";
 	if (r.type === "terminal") return typeof r.text === "string";
 	return false;
 }
@@ -453,12 +469,15 @@ const EDITOR_CANDIDATES: EditorCandidate[] = [
 
 async function fetchLatestRelease(): Promise<{ version: string; assetUrl: string; assetName: string }> {
 	const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
-	const response = await fetch(url, {
-		headers: {
-			Accept: "application/vnd.github+json",
-			"User-Agent": "pi-ide-bridge-extension",
-		},
-	});
+	const headers: Record<string, string> = {
+		Accept: "application/vnd.github+json",
+		"User-Agent": "pi-ide-bridge-extension",
+	};
+	const token = process.env.GITHUB_TOKEN;
+	if (token) {
+		headers.Authorization = `Bearer ${token}`;
+	}
+	const response = await fetch(url, { headers });
 	if (!response.ok) {
 		throw new Error(`GitHub API returned ${response.status} ${response.statusText}`);
 	}
@@ -585,6 +604,11 @@ export default function (pi: ExtensionAPI): void {
 		if (!state.connected) return;
 		if (Date.now() - lastActivityAt > HEARTBEAT_TIMEOUT_MS) {
 			state.connected = false;
+			state.editor = null;
+			state.activeFile = null;
+			state.workspaceRoots = [];
+			state.openFiles = [];
+			state.selection = null;
 			if (currentCtx) updateStatus(currentCtx);
 		}
 	}
@@ -643,9 +667,10 @@ export default function (pi: ExtensionAPI): void {
 			const ctxRef = currentCtx ?? ctx;
 
 			if (req.url === "/ide-ping") {
+				const wasConnected = state.connected;
 				markActivity(ctxRef);
-				res.writeHead(200);
-				res.end("ok");
+				res.writeHead(200, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ needState: !wasConnected }));
 				return;
 			}
 
@@ -755,6 +780,7 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("before_agent_start", async (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
+		if (!state.connected) return;
 		if (!state.activeFile && !state.selection) return;
 
 		const message = buildContextMessage(state);
