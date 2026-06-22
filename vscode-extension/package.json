@@ -1,0 +1,119 @@
+{
+	"name": "pi-ide-bridge-vscode",
+	"displayName": "Pi IDE Bridge (VS Code / Cursor / Trae)",
+	"description": "Sends VS Code, Cursor, and Trae context (active file, selection, open files, workspace roots) to the Pi coding agent.",
+	"version": "0.3.0",
+	"publisher": "earendil-works",
+	"engines": {
+		"vscode": "^1.80.0"
+	},
+	"categories": [
+		"Other",
+		"Machine Learning",
+		"Snippets"
+	],
+	"keywords": [
+		"pi",
+		"coding-agent",
+		"ide-bridge",
+		"vscode",
+		"cursor",
+		"trae"
+	],
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"main": "./out/extension.js",
+	"contributes": {
+		"configuration": {
+			"title": "Pi IDE Bridge",
+			"properties": {
+				"piIdeBridge.port": {
+					"type": "number",
+					"default": 17325,
+					"description": "Base port of the Pi IDE bridge HTTP server."
+				},
+				"piIdeBridge.enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "Enable sending IDE context to Pi."
+				},
+				"piIdeBridge.heartbeatInterval": {
+					"type": "number",
+					"default": 5000,
+					"description": "Milliseconds between heartbeat pings to Pi. Set to 0 to disable."
+				}
+			}
+		},
+		"commands": [
+			{
+				"command": "piIdeBridge.enable",
+				"title": "Enable Pi IDE Bridge"
+			},
+			{
+				"command": "piIdeBridge.disable",
+				"title": "Disable Pi IDE Bridge"
+			},
+			{
+				"command": "piIdeBridge.insertFile",
+				"title": "Insert into Pi Agent",
+				"category": "Pi"
+			},
+			{
+				"command": "piIdeBridge.insertSelection",
+				"title": "Send Selection to Pi Agent",
+				"category": "Pi"
+			},
+			{
+				"command": "piIdeBridge.insertTerminalSelection",
+				"title": "Send Terminal Selection to Pi Agent",
+				"category": "Pi"
+			}
+		],
+		"menus": {
+			"explorer/context": [
+				{
+					"command": "piIdeBridge.insertFile",
+					"group": "5_cutcopypaste@1"
+				}
+			],
+			"editor/context": [
+				{
+					"command": "piIdeBridge.insertSelection",
+					"group": "9_cutcopypaste@5",
+					"when": "editorHasSelection"
+				}
+			],
+			"terminal/context": [
+				{
+					"command": "piIdeBridge.insertTerminalSelection",
+					"group": "2_edit@5"
+				}
+			]
+		},
+		"keybindings": [
+			{
+				"command": "piIdeBridge.insertFile",
+				"key": "ctrl+shift+i",
+				"mac": "cmd+shift+i",
+				"when": "editorTextFocus"
+			},
+			{
+				"command": "piIdeBridge.insertSelection",
+				"key": "ctrl+shift+s",
+				"mac": "cmd+shift+s",
+				"when": "editorTextFocus && editorHasSelection"
+			}
+		]
+	},
+	"scripts": {
+		"compile": "tsc -p ./",
+		"watch": "tsc -watch -p ./"
+	},
+	"devDependencies": {
+		"@types/node": "22.19.19",
+		"@types/vscode": "1.80.0",
+		"@vscode/vsce": "3.9.2",
+		"typescript": "5.9.3"
+	}
+}

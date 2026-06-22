@@ -1,0 +1,39 @@
+{
+	"name": "pi-ide-bridge",
+	"version": "0.3.0",
+	"description": "IDE bridge extension for Pi: VS Code / Cursor / Trae context, file inserts, and heartbeat support.",
+	"main": "extensions/ide-bridge.ts",
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"ide-bridge",
+		"vscode",
+		"cursor",
+		"trae"
+	],
+	"author": "Wuhu-dsm",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Wuhu-dsm/pi-ide-bridge.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Wuhu-dsm/pi-ide-bridge/issues"
+	},
+	"homepage": "https://github.com/Wuhu-dsm/pi-ide-bridge#readme",
+	"files": [
+		"extensions",
+		"README.md",
+		"LICENSE"
+	],
+	"pi": {
+		"extensions": [
+			"./extensions"
+		],
+		"image": "https://github.com/Wuhu-dsm/pi-ide-bridge/raw/main/screenshot.png"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*"
+	}
+}
