@@ -15,33 +15,35 @@ Companion extension for the [Pi coding agent](https://pi.dev). It sends your edi
 
 ## Install
 
-1. Build the extension:
+> The VS Code Marketplace version is not published yet. For now install from the `.vsix` in the [GitHub releases](https://github.com/Wuhu-dsm/pi-ide-bridge/releases/latest).
+
+1. Download the latest `.vsix`:
 
    ```bash
-   npm install --ignore-scripts
-   npm run compile
+   curl -L -o pi-ide-bridge-vscode-0.3.0.vsix \
+     https://github.com/Wuhu-dsm/pi-ide-bridge/releases/download/v0.3.0/pi-ide-bridge-vscode-0.3.0.vsix
    ```
 
-2. Install into VS Code / Cursor / Trae:
-
-   - Open the `ide-bridge-vscode/` folder in your editor.
-   - Press `F5` to launch an Extension Development Host, **or**
-   - Run `vsce package` to create a `.vsix`, then install it via the command palette (`Extensions: Install from VSIX`).
-
-3. Install the Pi extension:
+2. Install into your editor:
 
    ```bash
-   # Global install
-   cp ../ide-bridge.ts ~/.pi/agent/extensions/
+   # VS Code
+   code --install-extension pi-ide-bridge-vscode-0.3.0.vsix
 
-   # Or project-local:
-   # cp ../ide-bridge.ts /path/to/your/project/.pi/extensions/
+   # Cursor
+   cursor --install-extension pi-ide-bridge-vscode-0.3.0.vsix
+
+   # Trae
+   trae --install-extension pi-ide-bridge-vscode-0.3.0.vsix
    ```
 
-   A packaged version is also available on npm as `pi-ide-bridge`:
+   Or open the Extensions view, click `...` → **Install from VSIX**.
+
+3. Install the Pi extension from npm:
 
    ```bash
    pi install npm:pi-ide-bridge
+   /reload
    ```
 
 4. Start Pi in a project that matches the workspace root. The status bar will show `IDE: not connected` until the companion extension activates and sends its first state update.
